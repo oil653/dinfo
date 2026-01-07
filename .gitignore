@@ -1,1 +1,3 @@
 /target
+*.kra~
+.kra-autosave.kra
