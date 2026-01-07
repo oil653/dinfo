@@ -1,0 +1,8 @@
+[package]
+name = "dinfo"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+gtk = { version = "0.10.3", package = "gtk4", features = ["v4_20"] }
+gtk-ls = { version = "0.7.1", package = "gtk4-layer-shell" }

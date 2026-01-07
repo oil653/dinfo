@@ -1,0 +1,28 @@
+.title {
+    font-family: 'Jersey 15';
+}
+
+.meow {
+    background-color: red;
+}
+
+.moew {
+    background-color: aqua;
+}
+
+#main_window {
+    background-color: grey;     /* CHANGE ME, DEBUG COLOR ONLY! */
+    /* background-color: transparent; */
+}
+
+#clock {
+    color: blue;                /* CHANGE ME, DEBUG COLOR ONLY! */
+    font-size: 150px;
+    line-height: 0.7;
+}
+
+#date {
+    color: blue;                /* CHANGE ME, DEBUG COLOR ONLY! */
+    font-size: 60px;
+    line-height: 0.8;
+}
