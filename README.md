@@ -1,6 +1,6 @@
 WIP
 
-A clock, and a weather app that live between your background, and your apps.
+A clock, and a weather app that lives between your background, and your apps (on wayland).
 
 For the weather data it uses open-meteo's free api
 
