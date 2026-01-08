@@ -25,8 +25,8 @@ pub enum Temperature {
 impl Temperature {
     pub fn to_string(&self) -> String {
         match self {
-            Temperature::Celsius => "C°".to_string(),
-            Temperature::Fahrenheit => "F°".to_string()
+            Temperature::Celsius => "°C".to_string(),
+            Temperature::Fahrenheit => "°F".to_string()
         }
     }
 }

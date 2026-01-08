@@ -1,7 +1,27 @@
-.title {
+.text {
     font-family: 'Jersey 15';
 }
 
+.emoji {
+    /* Insert cool emoji font family, probably */
+    font-family: 'Jersey 15';
+}
+
+.island {
+    background-color: rgba(40, 40, 40, 0.5);
+    border-radius: 15px;
+}
+
+.current_weather_title {
+    font-size: 100px;
+}
+
+.current_weather_text {
+    font-size: 25px;
+    /* line-height: 0.8; */
+}
+
+/* Debug classes only */
 .meow {
     background-color: red;
 }
@@ -10,11 +30,12 @@
     background-color: aqua;
 }
 
+/* === WINDOW === */
 #main_window {
-    background-color: grey;     /* CHANGE ME, DEBUG COLOR ONLY! */
-    /* background-color: transparent; */
+    background-color: transparent;
 }
 
+/* Top section */
 #clock {
     color: blue;                /* CHANGE ME, DEBUG COLOR ONLY! */
     font-size: 150px;
@@ -25,4 +46,14 @@
     color: blue;                /* CHANGE ME, DEBUG COLOR ONLY! */
     font-size: 60px;
     line-height: 0.8;
+}
+
+/* Bottom section */
+#current_weather_temp {
+    font-size: 100px;
+    line-height: 0.8;
+}
+
+#current_weather_string {
+    font-size: 30px;
 }

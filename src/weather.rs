@@ -3,16 +3,32 @@ use std::fmt;
 
 // Planned methods: fmt::Display for all types
 pub struct Precipitation {
-    pub combined: f32,
-    pub rain: f32,
-    pub showers: f32,
-    pub snowfall: f32,
-    pub unit: Unit::Precipitation
+    combined: f32,
+    rain: f32,
+    showers: f32,
+    snowfall: f32,
+    unit: Unit::Precipitation
 }
 
 impl Precipitation {
     pub fn new(combined: f32, rain: f32, showers: f32, snowfall: f32, unit: Unit::Precipitation) -> Precipitation {
         Precipitation { combined, rain, showers, snowfall, unit }
+    }
+
+    pub fn combined_to_string(&self) -> String {
+        format!("{}{}", self.combined, self.unit.to_string())
+    }
+    
+    pub fn rain_to_string(&self) -> String {
+        format!("{}{}", self.rain, self.unit.to_string())
+    }
+    
+    pub fn showers_to_string(&self) -> String {
+        format!("{}{}", self.showers, self.unit.to_string())
+    }
+    
+    pub fn snowfall_to_string(&self) -> String {
+        format!("{}{}", self.snowfall, self.unit.to_string())
     }
 }
 
@@ -26,16 +42,25 @@ impl Wind {
     pub fn new(speed: u16, direction: f32, unit: Unit::Speed) -> Self {
         Self { speed, direction, unit }
     }
-    pub fn get_speed(&self) -> u16 {
-        self.speed
+
+    pub fn speed_stringify(&self) -> String {
+        format!("{}{}", self.speed, self.unit.to_string())
     }
 
-    pub fn get_direction(&self) -> f32 {
-        self.direction
-    }
-
-    pub fn get_unit(&self) -> String {
-        self.unit.to_string()
+    pub fn direction_stringify(&self) -> String {
+        let normalized = self.direction % 360.0;
+        let normalized = if normalized < 0.0 { normalized + 360.0 } else { normalized };
+        
+        match normalized {
+            d if d >= 337.5 || d < 22.5 => "N".to_string(),
+            d if d < 67.5 => "NE".to_string(),
+            d if d < 112.5 => "E".to_string(),
+            d if d < 157.5 => "SE".to_string(),
+            d if d < 202.5 => "S".to_string(),
+            d if d < 247.5 => "SW".to_string(),
+            d if d < 292.5 => "W".to_string(),
+            _ => "NW".to_string(),
+        }
     }
 }
 
@@ -60,21 +85,21 @@ impl fmt::Display for Temperature {
 /// The current weather returned by the api
 pub struct CurrentWeather {
     /// Current temp
-    temperature: Temperature,
+    pub temperature: Temperature,
     /// Current apparent (feels like) temp
-    apparent_temp: Temperature,
+    pub apparent_temp: Temperature,
     /// Humidity 0-100%
-    humidity: u8,
+    pub humidity: u8,
     /// True if it's daytime
-    is_day: bool,
+    pub is_day: bool,
     /// Precipitation: combined - rain - showers - snowfall
-    precipitation: Precipitation,
+    pub precipitation: Precipitation,
     /// Weather code, 0-100
-    weather_code: WeatherCode,
+    pub weather_code: WeatherCode,
     /// Cloud cover 0-100%
-    cloud_cover: u8,
+    pub cloud_cover: u8,
     /// Wind speed / direction with units
-    wind: Wind
+    pub wind: Wind
 }
 
 impl CurrentWeather {
@@ -100,7 +125,23 @@ impl CurrentWeather {
             68,
             false,
             Precipitation::new(0.15, 0.12, 0.3, 0.0, Unit::Precipitation::Mm),
-            WeatherCode::from_code(2).unwrap(),
+            WeatherCode::from_code(2).expect("Invalid WMO code provided"),
+            80,
+            Wind::new(40, 16.0, Unit::Speed::Kmh)
+        )
+        
+    }
+
+    /// Creates an example struct with all the values filled in, the weather code can be passed. 
+    /// Intended for testing and developing purposes
+    pub fn new_example_with_code(code: usize) -> Self {
+        Self::new(
+            Temperature::new(32.0, Unit::Temperature::Celsius),
+            Temperature::new(35.0, Unit::Temperature::Celsius), 
+            68,
+            false,
+            Precipitation::new(0.15, 0.12, 0.3, 0.0, Unit::Precipitation::Mm),
+            WeatherCode::from_code(code).expect("Invalid WMO code provided"),
             80,
             Wind::new(40, 16.0, Unit::Speed::Kmh)
         )
@@ -128,7 +169,6 @@ pub enum SimpleIntensity {
     Heavy
 }
 
-// Planned methods: to_emoji()
 pub enum WeatherCode {
     Clear,
     Cloudy(CloudCover),
@@ -207,7 +247,7 @@ impl WeatherCode {
     }
 
     /// Converts a weather code back to a human readable string
-     fn to_string(&self) -> String {
+    pub fn to_string(&self) -> String {
         match self {
             Self::Clear => "Clear sky".to_string(),
 
@@ -272,6 +312,35 @@ impl WeatherCode {
                 SimpleIntensity::Light => "Thunderstorm with slight hail".to_string(),
                 SimpleIntensity::Heavy => "Thunderstorm with heavy hail".to_string(),
             },
+        }
+    }
+    /// Converts a weather code back to a string containing a utf emoji representing the weather condition
+    pub fn to_emoji(&self, is_night: bool) -> String {
+        match self {
+            Self::Clear => {
+                if is_night {
+                    "☀️".to_string()
+                } else {
+                    "🌙".to_string()
+                }
+            },
+
+            Self::Cloudy(cloud_cover) => match cloud_cover {
+                CloudCover::MainlyClear => "🌤️".to_string(),
+                _ => "🌥️".to_string()
+            },
+
+            Self::Fog {is_rime_fog: _} => "🌫️".to_string(),
+
+            Self::Drizzle(_) => "🌦️".to_string(),
+
+            Self::Rain(_) | Self::FreezingRain(_) | Self::RainShowers(_) => "🌧️".to_string(),
+
+            Self::SnowFall(_) | Self::SnowShowers(_) | Self::FreezingDrizzle(_) => "️🌨️".to_string(),
+
+            Self::SnowGrains => "❄️".to_string(),
+
+            Self::Thunderstorm | Self::ThunderstormWithHail(_) => "⛈️".to_string(),
         }
     }
 }
