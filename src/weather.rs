@@ -1,30 +1,60 @@
 use crate::units as Unit;
+use std::fmt;
 
 // Planned methods: fmt::Display for all types
 pub struct Precipitation {
-    pub combined: u16,
-    pub rain: u16,
-    pub showers: u16,
-    pub snowfall: u16,
+    pub combined: f32,
+    pub rain: f32,
+    pub showers: f32,
+    pub snowfall: f32,
     pub unit: Unit::Precipitation
 }
 
-// Planned methods: to_string(), to_emoji()
-pub struct WeatherCode {
-    code: u8
+impl Precipitation {
+    pub fn new(combined: f32, rain: f32, showers: f32, snowfall: f32, unit: Unit::Precipitation) -> Precipitation {
+        Precipitation { combined, rain, showers, snowfall, unit }
+    }
 }
 
-// Planned methods: fmt::Display for all the types
 pub struct Wind {
-    pub speed: u16,
-    pub direction: f32,
-    pub unit: Unit::Speed
+    speed: u16,
+    direction: f32,
+    unit: Unit::Speed
 }
 
-// Planned methods: fmt::Display
+impl Wind {
+    pub fn new(speed: u16, direction: f32, unit: Unit::Speed) -> Self {
+        Self { speed, direction, unit }
+    }
+    pub fn get_speed(&self) -> u16 {
+        self.speed
+    }
+
+    pub fn get_direction(&self) -> f32 {
+        self.direction
+    }
+
+    pub fn get_unit(&self) -> String {
+        self.unit.to_string()
+    }
+}
+
+
 pub struct Temperature {
     value: f32,
     unit: Unit::Temperature
+}
+
+impl Temperature {
+    pub fn new(value: f32, unit: Unit::Temperature) -> Self {
+        Self {value, unit}
+    }
+}
+
+impl fmt::Display for Temperature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.value, self.unit.to_string())
+    }
 }
 
 /// The current weather returned by the api
@@ -42,7 +72,206 @@ pub struct CurrentWeather {
     /// Weather code, 0-100
     weather_code: WeatherCode,
     /// Cloud cover 0-100%
-    cloud_clover: u8,
+    cloud_cover: u8,
     /// Wind speed / direction with units
     wind: Wind
+}
+
+impl CurrentWeather {
+    pub fn new (
+        temperature: Temperature, 
+        apparent_temp: Temperature, 
+        humidity: u8, 
+        is_day: bool, 
+        precipitation: Precipitation, 
+        weather_code: WeatherCode, 
+        cloud_cover: u8, 
+        wind: Wind
+    ) -> Self {
+        CurrentWeather { temperature, apparent_temp, humidity, is_day, precipitation, weather_code, cloud_cover, wind }
+    }
+
+    /// Creates an example struct with all the values filled in. 
+    /// Intended for testing and developing purposes
+    pub fn new_example() -> Self {
+        Self::new(
+            Temperature::new(32.0, Unit::Temperature::Celsius),
+            Temperature::new(35.0, Unit::Temperature::Celsius), 
+            68,
+            false,
+            Precipitation::new(0.15, 0.12, 0.3, 0.0, Unit::Precipitation::Mm),
+            WeatherCode::from_code(2).unwrap(),
+            80,
+            Wind::new(40, 16.0, Unit::Speed::Kmh)
+        )
+        
+    }
+}
+
+/// Cloud cover over an area
+pub enum CloudCover {
+    MainlyClear,
+    Partial,
+    Overcast
+}
+
+/// Basic intensity of a weather event
+pub enum Intensity {
+    Light,
+    Moderate, 
+    Heavy
+}
+
+/// Intensity for weather events with 2 states
+pub enum SimpleIntensity {
+    Light,
+    Heavy
+}
+
+// Planned methods: to_emoji()
+pub enum WeatherCode {
+    Clear,
+    Cloudy(CloudCover),
+    Fog{is_rime_fog: bool},
+    Drizzle(Intensity),
+    FreezingDrizzle(SimpleIntensity),
+    Rain(Intensity),
+    FreezingRain(SimpleIntensity),
+    SnowFall(Intensity),
+    SnowGrains,
+    RainShowers(Intensity),
+    SnowShowers(SimpleIntensity),
+    Thunderstorm,
+    ThunderstormWithHail(SimpleIntensity)
+}
+
+impl WeatherCode {
+    /// Constructs a WeatherCode instance from a weather code, returns none if the weather code isnt supported
+    /// List of supported weather code: 
+    ///    <table>
+    ///  <thead>
+    ///    <tr>
+    ///      <th>Code</th>
+    ///      <th>Description</th>
+    ///    </tr>
+    ///  </thead>
+    ///  <tbody>
+    ///    <tr><td>0</td><td>Clear sky</td></tr>
+    ///    <tr><td>1, 2, 3</td><td>Mainly clear, partly cloudy, and overcast</td></tr>
+    ///    <tr><td>45, 48</td><td>Fog and depositing rime fog</td></tr>
+    ///    <tr><td>51, 53, 55</td><td>Drizzle: Light, moderate, and dense intensity</td></tr>
+    ///    <tr><td>56, 57</td><td>Freezing drizzle: Light and dense intensity</td></tr>
+    ///    <tr><td>61, 63, 65</td><td>Rain: Slight, moderate, and heavy intensity</td></tr>
+    ///    <tr><td>66, 67</td><td>Freezing rain: Light and heavy intensity</td></tr>
+    ///    <tr><td>71, 73, 75</td><td>Snow fall: Slight, moderate, and heavy intensity</td></tr>
+    ///    <tr><td>77</td><td>Snow grains</td></tr>
+    ///    <tr><td>80, 81, 82</td><td>Rain showers: Slight, moderate, and violent</td></tr>
+    ///    <tr><td>85, 86</td><td>Snow showers: Slight and heavy</td></tr>
+    ///    <tr><td>95 </td><td>Thunderstorm: Slight or moderate</td></tr>
+    ///    <tr><td>96, 99</td><td>Thunderstorm with slight and heavy hail</td></tr>
+    ///  </tbody>
+    /// </table>
+    /// source: https://open-meteo.com/en/docs?hourly=&current=weather_code#weather_variable_documentation
+    fn from_code(code: usize) -> Option<Self> {
+        match code {
+            0 => Some(Self::Clear),
+            1 => Some(Self::Cloudy(CloudCover::MainlyClear)),
+            2 => Some(Self::Cloudy(CloudCover::Partial)),
+            3 => Some(Self::Cloudy(CloudCover::Overcast)),
+            45 => Some(Self::Fog { is_rime_fog: false }),
+            48 => Some(Self::Fog { is_rime_fog: true }),
+            51 => Some(Self::Drizzle(Intensity::Light)),
+            53 => Some(Self::Drizzle(Intensity::Moderate)),
+            55 => Some(Self::Drizzle(Intensity::Heavy)),
+            56 => Some(Self::FreezingDrizzle(SimpleIntensity::Light)),
+            57 => Some(Self::FreezingDrizzle(SimpleIntensity::Heavy)),
+            61 => Some(Self::Rain(Intensity::Light)),
+            63 => Some(Self::Rain(Intensity::Moderate)),
+            65 => Some(Self::Rain(Intensity::Heavy)),
+            66 => Some(Self::FreezingRain(SimpleIntensity::Light)),
+            67 => Some(Self::FreezingRain(SimpleIntensity::Heavy)),
+            71 => Some(Self::SnowFall(Intensity::Light)),
+            73 => Some(Self::SnowFall(Intensity::Moderate)),
+            75 => Some(Self::SnowFall(Intensity::Heavy)),
+            77 => Some(Self::SnowGrains),
+            80 => Some(Self::RainShowers(Intensity::Light)),
+            81 => Some(Self::RainShowers(Intensity::Moderate)),
+            82 => Some(Self::RainShowers(Intensity::Heavy)),
+            85 => Some(Self::SnowShowers(SimpleIntensity::Light)),
+            86 => Some(Self::SnowShowers(SimpleIntensity::Heavy)),
+            95 => Some(Self::Thunderstorm),
+            96 => Some(Self::ThunderstormWithHail(SimpleIntensity::Light)),
+            99 => Some(Self::ThunderstormWithHail(SimpleIntensity::Heavy)),
+            _ => None
+        }
+    }
+
+    /// Converts a weather code back to a human readable string
+     fn to_string(&self) -> String {
+        match self {
+            Self::Clear => "Clear sky".to_string(),
+
+            Self::Cloudy(cloud_cover) => match cloud_cover {
+                CloudCover::MainlyClear => "Mainly clear".to_string(),
+                CloudCover::Partial => "Partly cloudy".to_string(),
+                CloudCover::Overcast => "Overcast".to_string(),
+            },
+
+            Self::Fog { is_rime_fog } => {
+                if *is_rime_fog {
+                    "Rime fog".to_string()
+                } else {
+                    "Fog".to_string()
+                }
+            }
+
+            Self::Drizzle(intensity) => match intensity {
+                Intensity::Light => "Light drizzle".to_string(),
+                Intensity::Moderate => "Moderate drizzle".to_string(),
+                Intensity::Heavy => "Dense drizzle".to_string(),
+            },
+
+            Self::FreezingDrizzle(intensity) => match intensity {
+                SimpleIntensity::Light => "Light freezing drizzle".to_string(),
+                SimpleIntensity::Heavy => "Dense freezing drizzle".to_string(),
+            },
+
+            Self::Rain(intensity) => match intensity {
+                Intensity::Light => "Light rain".to_string(),
+                Intensity::Moderate => "Moderate rain".to_string(),
+                Intensity::Heavy => "Heavy rain".to_string(),
+            },
+
+            Self::FreezingRain(intensity) => match intensity {
+                SimpleIntensity::Light => "Light freezing rain".to_string(),
+                SimpleIntensity::Heavy => "Heavy freezing rain".to_string(),
+            },
+
+            Self::SnowFall(intensity) => match intensity {
+                Intensity::Light => "Light snowfall".to_string(),
+                Intensity::Moderate => "Moderate snowfall".to_string(),
+                Intensity::Heavy => "Heavy snowfall".to_string(),
+            },
+
+            Self::SnowGrains => "Snow grains".to_string(),
+
+            Self::RainShowers(intensity) => match intensity {
+                Intensity::Light => "Light rain showers".to_string(),
+                Intensity::Moderate => "Moderate rain showers".to_string(),
+                Intensity::Heavy => "Violent rain showers".to_string(),
+            },
+
+            Self::SnowShowers(intensity) => match intensity {
+                SimpleIntensity::Light => "Light snow showers".to_string(),
+                SimpleIntensity::Heavy => "Heavy snow showers".to_string(),
+            },
+
+            Self::Thunderstorm => "Thunderstorm".to_string(),
+
+            Self::ThunderstormWithHail(intensity) => match intensity {
+                SimpleIntensity::Light => "Thunderstorm with slight hail".to_string(),
+                SimpleIntensity::Heavy => "Thunderstorm with heavy hail".to_string(),
+            },
+        }
+    }
 }

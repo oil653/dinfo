@@ -43,7 +43,9 @@ fn build_ui(app: &Application) {
     clock_main_box.append(&date);
 
 //  =========> WEATHER <=========
-
+    let wh = weather::CurrentWeather::new_example();
+    
+    
 
     let weather_box = Gbox::builder()
         .orientation(gtk::Orientation::Vertical)
