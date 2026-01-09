@@ -44,29 +44,19 @@ fn build_ui(app: &Application) {
 
 //  =========> WEATHER <=========
     // let wh = weather::CurrentWeather::new_example();
-    let wh = weather::CurrentWeather::new_example_with_code(96);
+    let wh = weather::CurrentWeather::new_example_with_code_fahrenheit(53);
     
-    // CURRENT WEATHER
-    // ========================\\
-        // LEFT
+    // CURRENT WEATHER    
+    // LEFT
     let current_weather_emoji = { 
         Label::builder()
         .label(wh.weather_code.to_emoji(wh.is_day))
         .css_classes(["emoji", "current_weather_title"])
         .justify(gtk::Justification::Left)
+        .valign(Align::Center)
+        .halign(Align::Start)
         .tooltip_text(format!("Cloud cover is {}%", wh.cloud_cover))
         .build()
-    };
-
-    let current_weather_string = { 
-        Label::builder()
-        .label(wh.weather_code.to_string())
-        .name("current_weather_string")
-        .css_classes(["text"])
-        .justify(gtk::Justification::Left)
-        .halign(Align::Start)
-        .margin_start(10)
-        .build() 
     };
 
     let current_weather_temp = {
@@ -85,61 +75,17 @@ fn build_ui(app: &Application) {
         .build()
     };
 
-    let current_weather_temp_box = {
+    let current_weather_middle = {
         Gbox::builder()
         .orientation(gtk::Orientation::Vertical)
         .halign(Align::Center)
+        .valign(Align::Center)
         .build()
     };
+    current_weather_middle.append(&current_weather_temp);
+    current_weather_middle.append(&current_weather_feels_like);
 
-    current_weather_temp_box.append(&current_weather_temp);
-    current_weather_temp_box.append(&current_weather_feels_like);
-
-    
-    let current_left = { Gbox::builder()
-        .orientation(gtk::Orientation::Vertical)
-        .halign(Align::Start)
-        .hexpand(true)
-        .build()
-    };
-
-    let current_left_top = {
-        Gbox::builder()
-        .orientation(gtk::Orientation::Horizontal)
-        .hexpand(true)
-        .height_request(80)
-        .halign(Align::Center)
-        .build()
-    };
-
-    current_left_top.append(&current_weather_emoji);
-    current_left_top.append(&current_weather_temp_box);
-
-    current_left.append(&current_left_top);
-    current_left.append(&current_weather_string);
-
-    let current_weather= { 
-        Gbox::builder()
-        .orientation(gtk::Orientation::Horizontal)
-        .css_classes(["island"])
-        .hexpand(true)
-        .vexpand(false)
-        // .height_request(140)
-        .build() 
-    };
-
-        // RIGHT
-    let current_right = {
-        Gbox::builder()
-        .orientation(gtk::Orientation::Vertical)
-        .halign(Align::End)
-        .hexpand(true)
-        .margin_end(10)
-        .margin_top(5)
-        .spacing(5)
-        .build()
-    };
-
+    // RIGHT
     let current_weather_humidity = {
         Label::builder()
         .label(format!("💧 {}%", wh.humidity))
@@ -163,12 +109,57 @@ fn build_ui(app: &Application) {
         .build()
     };
 
-    current_right.append(&current_weather_humidity);
-    current_right.append(&current_weather_prec);
-    current_right.append(&current_weather_wind);
+    let current_weather_right = {
+        Gbox::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .halign(Align::End)
+        .valign(Align::Center)
+        .hexpand(true)
+        .margin_end(10)
+        .margin_top(5)
+        .spacing(5)
+        .build()
+    };
+    current_weather_right.append(&current_weather_humidity);
+    current_weather_right.append(&current_weather_prec);
+    current_weather_right.append(&current_weather_wind);
 
-    current_weather.append(&current_left);
-    current_weather.append(&current_right);
+
+    let current_weather_data = {
+        Gbox::builder()
+        .orientation(gtk::Orientation::Horizontal)
+        .halign(Align::Center)
+        .hexpand(true)
+        .build()
+    };
+    current_weather_data.append(&current_weather_emoji);
+    current_weather_data.append(&current_weather_middle);
+    current_weather_data.append(&current_weather_right);
+
+
+    let current_weather_string = { 
+        Label::builder()
+        .label(wh.weather_code.to_string())
+        .name("current_weather_string")
+        .css_classes(["text"])
+        .justify(gtk::Justification::Left)
+        .halign(Align::Center)
+        .build() 
+    };
+
+    let current_weather = {
+        Gbox::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(0)
+        .css_classes(["island"])
+        .halign(Align::Center)
+        .hexpand(true)
+        .build()
+    };
+    current_weather.append(&current_weather_data);
+    current_weather.append(&current_weather_string);
+
+
     // =======================//
     // ROOT of WEATHER
     let weather_box = Gbox::builder()

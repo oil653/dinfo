@@ -147,6 +147,22 @@ impl CurrentWeather {
         )
         
     }
+    /// Creates an example struct with all the values filled in, the weather code can be passed.
+    /// This also uses fahrenheit.
+    /// Intended for testing and developing purposes
+    pub fn new_example_with_code_fahrenheit(code: usize) -> Self {
+        Self::new(
+            Temperature::new(105.0, Unit::Temperature::Celsius),
+            Temperature::new(105.0, Unit::Temperature::Fahrenheit), 
+            68,
+            false,
+            Precipitation::new(0.15, 0.12, 0.3, 0.0, Unit::Precipitation::Mm),
+            WeatherCode::from_code(code).expect("Invalid WMO code provided"),
+            80,
+            Wind::new(40, 16.0, Unit::Speed::Kmh)
+        )
+        
+    }
 }
 
 /// Cloud cover over an area
