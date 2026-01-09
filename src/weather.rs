@@ -1,7 +1,11 @@
 use crate::units as Unit;
-use std::fmt;
+pub use crate::units::Units;
 
-// Planned methods: fmt::Display for all types
+use public_ip_address;
+use open_meteo_rs::{self, Client, forecast::Options};
+use std::{error::Error, fmt};
+
+#[derive(Clone, Debug)]
 pub struct Precipitation {
     combined: f32,
     rain: f32,
@@ -32,19 +36,20 @@ impl Precipitation {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Wind {
-    speed: u16,
+    speed: f32,
     direction: f32,
     unit: Unit::Speed
 }
 
 impl Wind {
-    pub fn new(speed: u16, direction: f32, unit: Unit::Speed) -> Self {
+    pub fn new(speed: f32, direction: f32, unit: Unit::Speed) -> Self {
         Self { speed, direction, unit }
     }
 
     pub fn speed_stringify(&self) -> String {
-        format!("{}{}", self.speed, self.unit.to_string())
+        format!("{}{}", self.speed, self.unit.stringify())
     }
 
     pub fn direction_stringify(&self) -> String {
@@ -64,14 +69,14 @@ impl Wind {
     }
 }
 
-
+#[derive(Clone, Debug)]
 pub struct Temperature {
-    value: f32,
+    value: f64,
     unit: Unit::Temperature
 }
 
 impl Temperature {
-    pub fn new(value: f32, unit: Unit::Temperature) -> Self {
+    pub fn new(value: f64, unit: Unit::Temperature) -> Self {
         Self {value, unit}
     }
 }
@@ -127,7 +132,7 @@ impl CurrentWeather {
             Precipitation::new(0.15, 0.12, 0.3, 0.0, Unit::Precipitation::Mm),
             WeatherCode::from_code(2).expect("Invalid WMO code provided"),
             80,
-            Wind::new(40, 16.0, Unit::Speed::Kmh)
+            Wind::new(40.0, 16.0, Unit::Speed::Kmh)
         )
         
     }
@@ -143,7 +148,7 @@ impl CurrentWeather {
             Precipitation::new(0.15, 0.12, 0.3, 0.0, Unit::Precipitation::Mm),
             WeatherCode::from_code(code).expect("Invalid WMO code provided"),
             80,
-            Wind::new(40, 16.0, Unit::Speed::Kmh)
+            Wind::new(40.0, 16.0, Unit::Speed::Kmh)
         )
         
     }
@@ -159,7 +164,7 @@ impl CurrentWeather {
             Precipitation::new(0.15, 0.12, 0.3, 0.0, Unit::Precipitation::Mm),
             WeatherCode::from_code(code).expect("Invalid WMO code provided"),
             80,
-            Wind::new(40, 16.0, Unit::Speed::Kmh)
+            Wind::new(40.0, 16.0, Unit::Speed::Kmh)
         )
         
     }
@@ -361,9 +366,230 @@ impl WeatherCode {
     }
 }
 
+// =========================================
+#[derive(Debug)]
+pub struct Cordinates {
+    pub lat: f64,
+    pub lng: f64
+}
 
-pub async fn get_current_weather() -> Option<CurrentWeather> {
-    // Implement open-meteo-api call and de-serialization
+impl Cordinates {
+    pub fn new(lat: f64, lng: f64) -> Self {
+        Self { lat, lng }
+    }
+}
 
-    Some(CurrentWeather::new_example_with_code(96))
+pub async fn get_cordinates() -> Result<Cordinates, public_ip_address::error::Error> {
+    let res= match public_ip_address::perform_lookup(None).await {
+        Ok(r) => r,
+        Err(e) => return Err(e)
+    };
+
+    let err_msg = "Location api returned, but no cordinates were present";
+    
+    let lng = res.longitude.expect(err_msg);
+    let lat = res.latitude.expect(err_msg);
+    
+    Ok(Cordinates::new(lng, lat))
+}
+
+pub async fn get_city() -> Option<String> {
+    let res= match public_ip_address::perform_lookup(None).await {
+        Ok(r) => r,
+        Err(e) => return None
+    };
+    let city = res.city?;
+    Some(city)
+}
+
+pub async fn get_timezone() -> Option<String> {
+    let res= match public_ip_address::perform_lookup(None).await {
+        Ok(r) => r,
+        Err(e) => return None
+    };
+    let tz = res.time_zone?;
+    println!("Got timzone: {}", tz);
+    Some(tz)
+}
+
+pub async fn get_current_weather(units: &Units) -> Result<CurrentWeather, Box<dyn Error>> {
+    let (client, mut opts) = match weather_setup(&units).await {
+        Ok((client, opts)) => (client, opts),
+        Err(e) => return Err(e)
+    };
+
+    let mut current_parameters: Vec<String> = vec![
+        "temperature_2m", 
+        "relative_humidity_2m", 
+        "apparent_temperature", 
+        "is_day", 
+        "precipitation", 
+        "rain", 
+        "showers", 
+        "snowfall", 
+        "weather_code", 
+        "cloud_cover", 
+        "wind_speed_10m", 
+        "wind_direction_10m"
+    ].iter().map(|d| {d.to_string()}).collect();
+
+    opts.current.append(&mut current_parameters);
+    
+    
+    let res = client
+    .forecast(opts)
+    .await?
+    .current
+    .expect("Weather API returned current weather forecast, but it's empty (None)")
+    .values;
+    
+    println!("{:#?}", res);
+
+    let temp = Temperature::new(
+        res.get("temperature_2m")
+                .expect("Missing temperature_2m from api response")
+                .value
+                .as_f64()
+                .expect("Failed to parse json value"), 
+                units.temperature.clone()
+    );
+
+    let app_temp = Temperature::new(
+        res.get("apparent_temperature")
+                .expect("Missing apparent_temperature from api response")
+                .value
+                .as_f64()
+                .expect("Failed to parse json value"), 
+                units.temperature.clone()
+    );
+
+    let humidity = {
+        res.get("relative_humidity_2m")
+        .expect("Missing relative_humidity_2m from api response")
+        .value
+        .as_u64()
+        .expect("Failed to parse json value")
+    };
+    
+    let is_day = {
+        res.get("is_day")
+        .expect("Missing is_day from api response")
+        .value
+        .as_i64()
+        .expect("Failed to parse json value") 
+        == 0
+    };
+
+    let prec = {
+        Precipitation::new(
+            res.get("precipitation")
+                .expect("Missing precipitation from api response")
+                .value
+                .as_f64()
+                .expect("Failed to parse json value") as f32, 
+
+                res.get("rain")
+                .expect("Missing showers from api response")
+                .value
+                .as_f64()
+                .expect("Failed to parse json value") as f32,
+
+                res.get("showers")
+                .expect("Missing showers from api response")
+                .value
+                .as_f64()
+                .expect("Failed to parse json value") as f32,
+
+                res.get("snowfall")
+                .expect("Missing snowfall from api response")
+                .value
+                .as_f64()
+                .expect("Failed to parse json value") as f32,
+
+                units.precipitation.clone()
+        )
+    };
+    
+    let weather_code = {
+        WeatherCode::from_code(res.get("weather_code")
+            .expect("Missing weather_code from api response")
+            .value
+            .as_u64()
+            .expect("Failed to parse json value") as usize
+        ).expect("Invalid weather code recived from weather API")
+    };
+
+    let cloud_cover = {
+        res.get("cloud_cover")
+        .expect("Missing cloud_cover from api response")
+        .value
+        .as_u64()
+        .expect("Failed to parse json value") as u8
+    };
+
+    let wind = {
+        Wind::new(
+            res.get("wind_speed_10m")
+                .expect("Missing wind_speed_10m from api response")
+                .value
+                .as_f64()
+                .expect("Failed to parse json value") as f32, 
+
+                res.get("rain")
+                .expect("Missing showers from api response")
+                .value
+                .as_f64()
+                .expect("Failed to parse json value") as f32,
+
+                units.speed.clone()
+        )
+    };
+
+    let current_weather = CurrentWeather::new(
+        temp, 
+        app_temp, 
+        humidity as u8, 
+        is_day, 
+        prec, 
+        weather_code, 
+        cloud_cover, 
+        wind
+    );
+
+    Ok(current_weather)
+}
+/// Saves some boilerplate by setting up units, location and timezone
+async fn weather_setup(units: &Units) -> Result<(Client, Options), Box<dyn Error>> {
+    let client = open_meteo_rs::Client::new();
+    let mut opts = open_meteo_rs::forecast::Options::default();
+
+    let loc = match get_cordinates().await {
+        Ok(d) => d,
+        Err(e) => return Err(Box::new(e))
+    };
+
+    opts.location = open_meteo_rs::Location { lat: loc.lat, lng: loc.lng };
+
+    opts.temperature_unit = Some(match units.temperature {
+        Unit::Temperature::Celsius => open_meteo_rs::forecast::TemperatureUnit::Celsius,
+        Unit::Temperature::Fahrenheit => open_meteo_rs::forecast::TemperatureUnit::Fahrenheit
+    });
+
+    opts.wind_speed_unit = Some(match units.speed {
+        Unit::Speed::Kmh => open_meteo_rs::forecast::WindSpeedUnit::Kmh,
+        Unit::Speed::Knots => open_meteo_rs::forecast::WindSpeedUnit::Kn,
+        Unit::Speed::Ms => open_meteo_rs::forecast::WindSpeedUnit::Ms,
+        Unit::Speed::Mph => open_meteo_rs::forecast::WindSpeedUnit::Mph
+    });
+
+    opts.precipitation_unit = Some(match units.precipitation {
+        Unit::Precipitation::Inch => open_meteo_rs::forecast::PrecipitationUnit::Inches,
+        Unit::Precipitation::Mm => open_meteo_rs::forecast::PrecipitationUnit::Millimeters
+    });
+
+    opts.time_zone = get_timezone().await;
+
+    opts.cell_selection = Some(open_meteo_rs::forecast::CellSelection::Nearest);
+
+    Ok((client, opts))
 }

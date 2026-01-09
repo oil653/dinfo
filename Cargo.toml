@@ -7,3 +7,6 @@ edition = "2024"
 async-channel = "2.5.0"
 gtk = { version = "0.10.3", package = "gtk4", features = ["v4_20"] }
 gtk-ls = { version = "0.7.1", package = "gtk4-layer-shell" }
+open-meteo-rs = "0.0.5"
+public-ip-address = "0.4.0"
+tokio = { version = "1.49.0", features = ["rt-multi-thread"] }

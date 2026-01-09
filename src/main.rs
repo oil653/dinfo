@@ -5,12 +5,28 @@ use gtk_ls::{self, LayerShell, Layer};
 
 use async_channel;
 
-use crate::weather::CurrentWeather;
+use crate::{units::Units, weather::CurrentWeather};
 
 mod weather;
+
 mod units;
+use units::{Speed, Precipitation, Temperature};
+
+use std::sync::Arc;
+
+use tokio::runtime::Runtime;
+use std::sync::OnceLock;
 
 const APP_ID: &str = "dinfo.oil653";
+
+// Tokio is needed for some crates, like open-meteo-rs
+// Most of the async task are still handled by glib's executor
+fn runtime() -> &'static Runtime {
+    static RUNTIME: OnceLock<Runtime> = OnceLock::new();
+    RUNTIME.get_or_init(|| {
+        Runtime::new().expect("Setting up tokio runtime needs to succeed.")
+    })
+}
 
 fn build_ui(app: &Application) {
 //  =========> CLOCK <=========
@@ -42,6 +58,7 @@ fn build_ui(app: &Application) {
 //  =========> WEATHER <=========
     // let wh = weather::CurrentWeather::new_example();
     let wh = weather::CurrentWeather::new_example_with_code_fahrenheit(53);
+    let units = Arc::new(Units::new(Speed::Kmh, Temperature::Celsius, Precipitation::Mm));
     
 // CURRENT WEATHER    
     // LEFT
@@ -201,11 +218,19 @@ fn build_ui(app: &Application) {
     // Button to update the current weather
     let update_button = Button::with_label("Update weather");
     update_button.connect_clicked(move |_| {
-        glib::spawn_future_local(glib::clone!(
+        runtime().spawn(glib::clone!(
             #[strong]
             sender,
+            #[strong]
+            units,
             async move {
-                let data = weather::get_current_weather().await;
+                let data = match weather::get_current_weather(&units).await {
+                    Ok(d) => Some(d),
+                    Err(e) => {
+                        println!("{}", e.to_string());
+                        None
+                    }
+                };
                 println!("Got current weather");
                 sender.send(data).await.expect("Tried to send weather data on async channel");
             }
