@@ -446,7 +446,7 @@ pub async fn get_current_weather(units: &Units) -> Result<CurrentWeather, Box<dy
     .expect("Weather API returned current weather forecast, but it's empty (None)")
     .values;
     
-    println!("{:#?}", res);
+    // println!("{:#?}", res);
 
     let temp = Temperature::new(
         res.get("temperature_2m")

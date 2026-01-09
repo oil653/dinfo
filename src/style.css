@@ -18,7 +18,21 @@
 
 .current_weather_text {
     font-size: 25px;
-    /* line-height: 0.8; */
+}
+
+
+.clock {
+    color: blue;                /* CHANGE ME, DEBUG COLOR ONLY! */
+    font-size: 150px;
+    line-height: 0.7;
+    font-feature-settings: "tnum" 1;
+
+    opacity: 1;
+    transition: opacity 100ms ease-in-out;
+}
+
+.clock.fade-out {
+    opacity: 0;
 }
 
 /* Debug classes only */

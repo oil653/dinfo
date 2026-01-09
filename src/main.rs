@@ -1,6 +1,5 @@
 use gtk::{
-    Align, Application, Box as Gbox, Button, CssProvider, Label, gdk::Display, glib, prelude::*
-};
+    Align, Application, Box as Gbox, Button, Overlay, CssProvider, Label, gdk::Display, glib, prelude::*};
 use gtk_ls::{self, LayerShell, Layer};
 
 use async_channel;
@@ -17,6 +16,9 @@ use std::sync::Arc;
 use tokio::runtime::Runtime;
 use std::sync::OnceLock;
 
+use chrono;
+use std::time::Duration;
+
 const APP_ID: &str = "dinfo.oil653";
 
 // Tokio is needed for some crates, like open-meteo-rs
@@ -30,30 +32,85 @@ fn runtime() -> &'static Runtime {
 
 fn build_ui(app: &Application) {
 //  =========> CLOCK <=========
-    let clock_main_box = Gbox::builder()
-        .orientation(gtk::Orientation::Vertical)
-        .spacing(0)
-        .build();
-
-    let clock = Label::builder()
+    let clock1 = { 
+        Label::builder()
         .label("12:41:69")
-        .name("clock")
-        .css_classes(["text"])
+        .name("clock1")
+        .css_classes(["text", "clock"])
         .vexpand(false)
-        .build();
+        .halign(Align::Center)
+        .valign(Align::Center)
+        .build()
+    };
 
-    clock_main_box.append(&clock);
+    let clock2 = { 
+        Label::builder()
+        .label("12:41:69")
+        .name("clock2")
+        .css_classes(["text", "clock"])
+        .vexpand(false)
+        .halign(Align::Center)
+        .valign(Align::Center)
+        .build()
+    };
 
+    let clock = {
+        Overlay::builder()
+        .halign(Align::Center)
+        .valign(Align::Center)
+        .child(&clock1)
+        .build()
+    };
 
-
-    let date = Label::builder()
+    clock.add_overlay(&clock2);
+    
+    let date = {
+        Label::builder()
         .label("2026/01/01")
         .name("date")
         .css_classes(["text"])
         .vexpand(false)
-        .build();
+        .build()
+    };
 
+    let clock_main_box = {
+        Gbox::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(0)
+        .build()
+    };
+    clock_main_box.append(&clock);
+    // clock_main_box.append(&clock2);
     clock_main_box.append(&date);
+
+    // Animate, and drive the clock state changes
+    glib::spawn_future_local(glib::clone!(
+        #[weak]
+        clock1,
+        #[weak]
+        clock2,
+        async move {
+            loop {
+                let now = chrono::Local::now();
+                clock2.set_label(&now.format("%H:%M:%S").to_string());
+                clock2.remove_css_class("fade-out");
+                glib::timeout_future(Duration::from_millis(50)).await;
+                clock1.add_css_class("fade-out");
+
+                // glib::timeout_future(Duration::from_millis(1000)).await;
+                glib::timeout_future(Duration::from_millis(950)).await;
+
+                let now = chrono::Local::now();
+                clock1.set_label(&now.format("%H:%M:%S").to_string());
+                clock1.remove_css_class("fade-out");
+                glib::timeout_future(Duration::from_millis(50)).await;
+                clock2.add_css_class("fade-out");
+
+                // glib::timeout_future(Duration::from_millis(1000)).await;
+                glib::timeout_future(Duration::from_millis(950)).await;
+            }
+        }
+    ));
 
 //  =========> WEATHER <=========
     // let wh = weather::CurrentWeather::new_example();
@@ -213,11 +270,9 @@ fn build_ui(app: &Application) {
             }
         }
     ));
-    // =======================
-
-    // Button to update the current weather
-    let update_button = Button::with_label("Update weather");
-    update_button.connect_clicked(move |_| {
+    
+    // TODO! ATOMIC BOOL to make sure we're not parsing the same data while a request is going on
+    let parse_weather = move || {
         runtime().spawn(glib::clone!(
             #[strong]
             sender,
@@ -235,7 +290,12 @@ fn build_ui(app: &Application) {
                 sender.send(data).await.expect("Tried to send weather data on async channel");
             }
         ));
-    });
+    };
+    
+    // Button to update the current weather                             DEBUG
+    let update_button = Button::with_label("Update weather");
+    update_button.connect_clicked(move |_| parse_weather());
+    // =======================
 
     // ROOT of WEATHER
     let weather_box = Gbox::builder()
@@ -246,7 +306,7 @@ fn build_ui(app: &Application) {
         .build();
 
     weather_box.append(&current_weather);
-    weather_box.append(&update_button);
+    weather_box.append(&update_button);                     //  DEBUG
 
 //  =========> ROOT <=========
     // Main box, root of the app
@@ -290,6 +350,11 @@ fn load_css() {
 }
 
 fn main() -> glib::ExitCode {
+    // This is some magic variable that needs to be set, to cut the ram usage in half
+    unsafe {
+        std::env::set_var("GSK_RENDERER", "cairo");
+    }
+
     let app = Application::builder()
         .application_id(APP_ID)
         .build();

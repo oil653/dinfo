@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 async-channel = "2.5.0"
+chrono = "0.4.42"
 gtk = { version = "0.10.3", package = "gtk4", features = ["v4_20"] }
 gtk-ls = { version = "0.7.1", package = "gtk4-layer-shell" }
 open-meteo-rs = "0.0.5"

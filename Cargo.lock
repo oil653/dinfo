@@ -201,6 +201,7 @@ name = "dinfo"
 version = "0.0.1"
 dependencies = [
  "async-channel",
+ "chrono",
  "gtk4",
  "gtk4-layer-shell",
  "open-meteo-rs",
