@@ -360,3 +360,10 @@ impl WeatherCode {
         }
     }
 }
+
+
+pub async fn get_current_weather() -> Option<CurrentWeather> {
+    // Implement open-meteo-api call and de-serialization
+
+    Some(CurrentWeather::new_example_with_code(96))
+}
