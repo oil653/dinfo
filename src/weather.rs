@@ -123,6 +123,7 @@ impl CurrentWeather {
 
     /// Creates an example struct with all the values filled in. 
     /// Intended for testing and developing purposes
+    #[allow(dead_code)]
     pub fn new_example() -> Self {
         Self::new(
             Temperature::new(32.0, Unit::Temperature::Celsius),
@@ -139,6 +140,7 @@ impl CurrentWeather {
 
     /// Creates an example struct with all the values filled in, the weather code can be passed. 
     /// Intended for testing and developing purposes
+    #[allow(dead_code)]
     pub fn new_example_with_code(code: usize) -> Self {
         Self::new(
             Temperature::new(32.0, Unit::Temperature::Celsius),
@@ -393,10 +395,11 @@ pub async fn get_cordinates() -> Result<Cordinates, public_ip_address::error::Er
     Ok(Cordinates::new(lng, lat))
 }
 
+#[allow(dead_code)]
 pub async fn get_city() -> Option<String> {
     let res= match public_ip_address::perform_lookup(None).await {
         Ok(r) => r,
-        Err(e) => return None
+        Err(_) => return None
     };
     let city = res.city?;
     Some(city)
@@ -405,7 +408,7 @@ pub async fn get_city() -> Option<String> {
 pub async fn get_timezone() -> Option<String> {
     let res= match public_ip_address::perform_lookup(None).await {
         Ok(r) => r,
-        Err(e) => return None
+        Err(_) => return None
     };
     let tz = res.time_zone?;
     println!("Got timzone: {}", tz);

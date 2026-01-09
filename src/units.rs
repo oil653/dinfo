@@ -1,4 +1,5 @@
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub enum Speed {
     Kmh, 
     Ms,
@@ -6,6 +7,7 @@ pub enum Speed {
     Knots
 }
 
+#[allow(dead_code)]
 impl Speed {
     pub fn stringify(&self) -> String {
         match self {
@@ -42,6 +44,7 @@ impl Temperature {
 }
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub enum Precipitation {
     Mm,
     Inch
