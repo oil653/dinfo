@@ -391,8 +391,8 @@ pub async fn get_cordinates() -> Result<Cordinates, public_ip_address::error::Er
     
     let lng = res.longitude.expect(err_msg);
     let lat = res.latitude.expect(err_msg);
-    
-    Ok(Cordinates::new(lng, lat))
+
+    Ok(Cordinates::new(lat, lng))
 }
 
 #[allow(dead_code)]
@@ -443,10 +443,11 @@ pub async fn get_current_weather(units: &Units) -> Result<CurrentWeather, Box<dy
     .forecast(opts)
     .await?
     .current
-    .expect("Weather API returned current weather forecast, but it's empty (None)")
-    .values;
+    .expect("Weather API returned current weather forecast, but it's empty (None)");
     
     // println!("{:#?}", res);
+
+    let res = res.values;
 
     let temp = Temperature::new(
         res.get("temperature_2m")
