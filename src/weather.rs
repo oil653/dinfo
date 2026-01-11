@@ -88,6 +88,7 @@ impl fmt::Display for Temperature {
 }
 
 /// The current weather returned by the api
+#[derive(Debug, Clone)]
 pub struct CurrentWeather {
     /// Current temp
     pub temperature: Temperature,
@@ -173,6 +174,7 @@ impl CurrentWeather {
 }
 
 /// Cloud cover over an area
+#[derive(Debug, Clone)]
 pub enum CloudCover {
     MainlyClear,
     Partial,
@@ -180,6 +182,7 @@ pub enum CloudCover {
 }
 
 /// Basic intensity of a weather event
+#[derive(Debug, Clone)]
 pub enum Intensity {
     Light,
     Moderate, 
@@ -187,11 +190,13 @@ pub enum Intensity {
 }
 
 /// Intensity for weather events with 2 states
+#[derive(Debug, Clone)]
 pub enum SimpleIntensity {
     Light,
     Heavy
 }
 
+#[derive(Debug, Clone)]
 pub enum WeatherCode {
     Clear,
     Cloudy(CloudCover),
