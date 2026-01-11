@@ -5,7 +5,7 @@ use gtk::gdk;
 
 mod weather;
 mod units;
-use crate::{units::Units, weather::CurrentWeather};
+use crate::units::Units;
 use units::{Speed, Precipitation, Temperature};
 
 
@@ -263,46 +263,7 @@ fn build_ui(app: &Application, units: Arc<Units>) {
         current_weather.append(&current_weather_data);
         current_weather.append(&current_weather_string);
 
-        // Update the ui state
-        // let (sender, reciver) = async_channel::bounded::<Option<CurrentWeather>>(1);
-        // glib::spawn_future_local(glib::clone!(
-        //     #[weak] current_weather_emoji,
-        //     #[weak] current_weather_temp,
-        //     #[weak] current_weather_feels_like,
-        //     #[weak] current_weather_humidity,
-        //     #[weak] current_weather_prec,
-        //     #[weak] current_weather_wind,
-        //     #[weak] current_weather_string,
-        //     async move {
-        //         while let Ok(wh_opt) = reciver.recv().await {
-        //             if let Some(wh) = wh_opt {
-        //                 current_weather_emoji.set_label(&wh.weather_code.to_emoji(wh.is_day));
-        //                 current_weather_emoji.set_tooltip_text(Some(&format!("Cloud cover is {}%", wh.cloud_cover)));
-
-        //                 current_weather_temp.set_label(&wh.temperature.to_string());
-
-        //                 current_weather_feels_like.set_label(&format!("Feels like {}", wh.apparent_temp.to_string()));
-
-        //                 current_weather_humidity.set_label(&format!("💧 {}%", wh.humidity));
-        //                 current_weather_humidity.set_tooltip_text(Some("The relative humidity measured in the area"));
-
-        //                 current_weather_prec.set_label(&format!("🌧️ {}", wh.precipitation.combined_to_string()));
-        //                 current_weather_prec.set_tooltip_text(Some(&format!(
-        //                     "Rain: {}\nShowers: {}\nSnowfall: {}",
-        //                     wh.precipitation.rain_to_string(),
-        //                     wh.precipitation.showers_to_string(),
-        //                     wh.precipitation.snowfall_to_string()
-        //                 )));
-
-        //                 current_weather_wind.set_label(&format!("💨 {} {}", wh.wind.direction_stringify(), wh.wind.speed_stringify()));
-
-        //                 current_weather_string.set_label(&wh.weather_code.to_string());
-        //             } else {
-        //                 println!("Empty weather data received, leaving ui state untouched");
-        //             }
-        //         }
-        //     }
-        // ));
+        // WEATHER UPDATE LOGIC
 
         // Parses current weather and sends it on channel, so it can be put in state
         let parse_weather = {
@@ -374,6 +335,17 @@ fn build_ui(app: &Application, units: Arc<Units>) {
                 }
             }
         ));
+
+        // Get the weather data every 15 minutes. 
+        glib::spawn_future_local({
+            let parse = parse_weather.clone();
+            async move {
+                loop{
+                    parse();
+                    glib::timeout_future(std::time::Duration::from_mins(15)).await;
+                }
+            }
+        });
 
         // Button to update the current weather                                 DEBUG
         let update_button = Button::with_label("Update weather");
