@@ -47,6 +47,7 @@ fn build_ui(app: &Application) {
             while let Ok(weather) = current_rcv.recv().await {
                 current_weather_state.set_current(weather);
                 current_weather_state.set_is_parsing(false);
+                // println!("stopped parsing. is_parsing: {}", current_weather_state.is_parsing());
             }
         }
     ));
@@ -61,7 +62,13 @@ fn build_ui(app: &Application) {
             .build();
 
         let clock = build_clock(clock_state.clone());
-        let current_weather = build_current_weather(current_weather_state.clone(), current_snd);
+
+
+        let ( current_weather, update_internal) = build_current_weather(&current_weather_state, current_snd);
+
+        current_weather_state.connect_is_parsing_notify(move |_| {
+            update_internal();
+        });
 
         main_box.append(&clock);
         main_box.append(&current_weather);

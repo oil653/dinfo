@@ -44,6 +44,11 @@
     opacity: 0;
 }
 
+.no-bg {
+    all: unset;
+    background-color: transparent;
+}
+
 /* Debug classes only */
 .meow {
     background-color: red;
@@ -63,7 +68,6 @@
     line-height: 0.8;
 }
 
-/* Bottom section */
 #current_weather_temp {
     font-size: 100px;
     line-height: 0.8;
@@ -72,4 +76,8 @@
 #current_weather_string {
     font-size: 30px;
     line-height: 0.9;
+}
+
+#weather_repeat {
+    font-size: 30px;
 }

@@ -1,7 +1,7 @@
-use gtk::{ Align, Box as Gbox, Label, Button, Overlay, glib::{self, BindingFlags}, prelude::* };
+use gtk::{ Align, Box as Gbox, Button, GestureClick, Label, Overlay, glib::{self, BindingFlags}, prelude::* };
 
 use crate::{ clock::Clock, weather::CurrentWeather };
-use crate::weather_state::{ self, WeatherState };
+use crate::weather_state::WeatherState;
 
 use chrono::{ self, Local };
 use std::time::Duration;
@@ -144,13 +144,17 @@ fn runtime() -> &'static Runtime {
     })
 }
 
-pub fn build_current_weather(current_weather_state: WeatherState, weather_result_sender: async_channel::Sender<Option<CurrentWeather>>) -> Gbox {
-    //  =========> WEATHER <=========
-    let wh = weather::CurrentWeather::new_example_with_code_fahrenheit(0);
-    
-    // CURRENT WEATHER
+pub fn build_current_weather(
+    current_weather_state: &WeatherState, 
+    weather_result_sender: async_channel::Sender<Option<CurrentWeather>>, 
+) -> (Gbox, Box<dyn Fn()>) {
+    // Base weather data to initialise the ui with
+    let wh = weather::CurrentWeather::new_example_with_code(0);
+
+    let current_weather_state = current_weather_state.clone();
+
     // LEFT
-    let current_weather_emoji = { 
+    let weather_emoji = { 
         Label::builder()
         .label(wh.weather_code.to_emoji(wh.is_day))
         .css_classes(["emoji", "current_weather_title"])
@@ -161,7 +165,7 @@ pub fn build_current_weather(current_weather_state: WeatherState, weather_result
         .build()
     };
 
-    let current_weather_temp = {
+    let temp = {
         Label::builder()
         .label(wh.temperature.to_string())
         .name("current_weather_temp")
@@ -169,7 +173,7 @@ pub fn build_current_weather(current_weather_state: WeatherState, weather_result
         .build()
     };
 
-    let current_weather_feels_like = {
+    let feels_like = {
         Label::builder()
         .label(format!("Feels like {}", wh.apparent_temp.to_string()))
         .css_classes(["text", "current_weather_text"])
@@ -177,18 +181,18 @@ pub fn build_current_weather(current_weather_state: WeatherState, weather_result
         .build()
     };
 
-    let current_weather_middle = {
+    let temp_box = {
         Gbox::builder()
         .orientation(gtk::Orientation::Vertical)
         .halign(Align::Center)
         .valign(Align::Center)
         .build()
     };
-    current_weather_middle.append(&current_weather_temp);
-    current_weather_middle.append(&current_weather_feels_like);
+    temp_box.append(&temp);
+    temp_box.append(&feels_like);
 
     // RIGHT
-    let current_weather_humidity = {
+    let humidity = {
         Label::builder()
         .label(format!("💧 {}%", wh.humidity))
         .css_classes(["text", "current_weather_text"])
@@ -196,7 +200,7 @@ pub fn build_current_weather(current_weather_state: WeatherState, weather_result
         .build()
     };
 
-    let current_weather_prec = {
+    let prec = {
         Label::builder()
         .label(format!("🌧️ {}", wh.precipitation.combined_to_string()))
         .css_classes(["text", "current_weather_text"])
@@ -204,7 +208,7 @@ pub fn build_current_weather(current_weather_state: WeatherState, weather_result
         .build()
     };
 
-    let current_weather_wind = {
+    let wind = {
         Label::builder()
         .label(format!("💨 {} {}", wh.wind.direction_stringify(), wh.wind.speed_stringify()))
         .css_classes(["text", "current_weather_text"])
@@ -222,9 +226,9 @@ pub fn build_current_weather(current_weather_state: WeatherState, weather_result
         .spacing(5)
         .build()
     };
-    current_weather_right.append(&current_weather_humidity);
-    current_weather_right.append(&current_weather_prec);
-    current_weather_right.append(&current_weather_wind);
+    current_weather_right.append(&humidity);
+    current_weather_right.append(&prec);
+    current_weather_right.append(&wind);
 
 
     let current_weather_data = {
@@ -234,12 +238,12 @@ pub fn build_current_weather(current_weather_state: WeatherState, weather_result
         .hexpand(true)
         .build()
     };
-    current_weather_data.append(&current_weather_emoji);
-    current_weather_data.append(&current_weather_middle);
+    current_weather_data.append(&weather_emoji);
+    current_weather_data.append(&temp_box);
     current_weather_data.append(&current_weather_right);
 
 
-    let current_weather_string = { 
+    let status_string = { 
         Label::builder()
         .label(wh.weather_code.to_string())
         .name("current_weather_string")
@@ -256,12 +260,115 @@ pub fn build_current_weather(current_weather_state: WeatherState, weather_result
         .css_classes(["island"])
         .halign(Align::Center)
         .hexpand(true)
+        .margin_start(5)
+        .margin_end(5)
+        .margin_top(10)
         .build()
     };
     current_weather.append(&current_weather_data);
-    current_weather.append(&current_weather_string);
+    current_weather.append(&status_string);
+
+    let retry = {
+        Button::builder()
+            .label("🔁")
+            .css_name("weather_repeat")
+            .tooltip_text("Retry parsing weather data")
+            .margin_bottom(5)
+            .margin_top(5)
+            .margin_start(5)
+            .margin_end(5)
+            .build()
+    };
 
     // WEATHER UPDATE LOGIC
+
+    let update_ui = Box::new(glib::clone!(
+        #[strong] weather_emoji,
+        #[strong] temp,
+        #[strong] feels_like,
+        #[strong] humidity,
+        #[strong] prec,
+        #[strong] wind,
+        #[strong] status_string,
+        #[strong] retry,
+        #[strong] current_weather,
+        #[strong] current_weather_state,
+        move || {
+            // println!("IS_PARSING connection connected, yippi. {:?}", current_weather_state.get_current());
+            if let Some(wh) = current_weather_state.get_current() {
+                // Remove the network error retry button, and add back the normal interface if the parse succeeds
+                if let Some(parent) = retry.parent(){
+                    if let Some(gbox) = parent.downcast_ref::<Gbox>(){
+                        if *gbox == current_weather {
+                            current_weather.remove(&retry);
+
+                            current_weather.append(&current_weather_data);
+                            current_weather.append(&status_string);
+                        }
+                    }
+                }
+
+                let combined_time_format = format!("{} %H:%M:%S", crate::DATE_FORMAT.get().unwrap());
+                let current_time_date = Local::now().format(combined_time_format.as_str());
+                let last_updated = format!("Last updated: {}", current_time_date);
+                current_weather.set_tooltip_text(Some(last_updated.as_str()));
+
+                weather_emoji.set_label(&wh.weather_code.to_emoji(wh.is_day));
+                weather_emoji.set_tooltip_text(Some(&format!("Cloud cover is {}%", wh.cloud_cover)));
+
+                temp.set_label(&wh.temperature.to_string());
+
+                feels_like.set_label(&format!("Feels like {}", wh.apparent_temp.to_string()));
+
+                humidity.set_label(&format!("💧 {}%", wh.humidity));
+                humidity.set_tooltip_text(Some("The relative humidity measured in the area"));
+
+                prec.set_label(&format!("🌧️ {}", wh.precipitation.combined_to_string()));
+                prec.set_tooltip_text(Some(&format!(
+                    "Rain: {}\nShowers: {}\nSnowfall: {}",
+                    wh.precipitation.rain_to_string(),
+                    wh.precipitation.showers_to_string(),
+                    wh.precipitation.snowfall_to_string()
+                )));
+
+                wind.set_label(&format!("💨 {} {}", wh.wind.direction_stringify(), wh.wind.speed_stringify()));
+
+                status_string.set_label(&wh.weather_code.to_string());
+            } else {
+                println!("Empty weather data recieved :(");
+
+                // Check if current_weather_data and status string is parents
+                // of the box before trying to remove it to avoid errors
+                if let Some(parent) = current_weather_data.parent() {
+                    if let Some(gbox) = parent.downcast_ref::<Gbox>() {
+                        if *gbox == current_weather {
+                            current_weather.remove(&current_weather_data);
+                            current_weather.remove(&status_string);
+
+                            current_weather.append(&retry);
+                        }
+                    }
+                }
+
+                weather_emoji.set_label("");
+                weather_emoji.set_tooltip_text(None);
+
+                temp.set_label("");
+
+                feels_like.set_label("");
+
+                humidity.set_label("");
+                humidity.set_tooltip_text(None);
+
+                prec.set_label("");
+                prec.set_tooltip_text(None);
+
+                wind.set_label("");
+
+                status_string.set_label("");
+            }
+        }
+    ));
 
     // Parses current weather and sends it on channel, so it can be put in state
     let parse_weather = {
@@ -279,83 +386,21 @@ pub fn build_current_weather(current_weather_state: WeatherState, weather_result
             runtime().spawn(
                 async move {
                     let data = match weather::get_current_weather(crate::UNITS.get().unwrap()).await {
-                        Ok(d) => Some(d),
+                        Ok(d) => {
+                            println!("Got current weather");
+                            Some(d)
+                        },
                         Err(e) => {
-                            println!("{}", e.to_string());
+                            println!("Failed to get weather data: {}", e.to_string());
                             None
                         }
                     };
-                    println!("Got current weather");
+                    // println!("{:?}", data);
                     current_snd.send(data).await.expect("Tried to send current  weather data on async channel");
                 }
             );
         }
     };
-
-    // Update the ui for changed in the weather var
-    current_weather_state.connect_is_parsing_notify(glib::clone!(
-        #[weak] current_weather_emoji,
-        #[weak] current_weather_temp,
-        #[weak] current_weather_feels_like,
-        #[weak] current_weather_humidity,
-        #[weak] current_weather_prec,
-        #[weak] current_weather_wind,
-        #[weak] current_weather_string,
-        #[weak] current_weather,
-        move |state: &weather_state::WeatherState| {
-            if !state.is_parsing() {
-                if let Some(wh) = state.get_current() {
-
-                    current_weather.add_css_class("island");
-
-                    current_weather_emoji.set_label(&wh.weather_code.to_emoji(wh.is_day));
-                    current_weather_emoji.set_tooltip_text(Some(&format!("Cloud cover is {}%", wh.cloud_cover)));
-
-                    current_weather_temp.set_label(&wh.temperature.to_string());
-
-                    current_weather_feels_like.set_label(&format!("Feels like {}", wh.apparent_temp.to_string()));
-
-                    current_weather_humidity.set_label(&format!("💧 {}%", wh.humidity));
-                    current_weather_humidity.set_tooltip_text(Some("The relative humidity measured in the area"));
-
-                    current_weather_prec.set_label(&format!("🌧️ {}", wh.precipitation.combined_to_string()));
-                    current_weather_prec.set_tooltip_text(Some(&format!(
-                        "Rain: {}\nShowers: {}\nSnowfall: {}",
-                        wh.precipitation.rain_to_string(),
-                        wh.precipitation.showers_to_string(),
-                        wh.precipitation.snowfall_to_string()
-                    )));
-
-                    current_weather_wind.set_label(&format!("💨 {} {}", wh.wind.direction_stringify(), wh.wind.speed_stringify()));
-
-                    current_weather_string.set_label(&wh.weather_code.to_string());
-                } else {
-                    println!("Empty weather data recieved :(");
-
-                    current_weather.remove_css_class("island");
-
-                    current_weather_emoji.set_label("");
-                    current_weather_emoji.set_tooltip_text(None);
-
-                    current_weather_temp.set_label("");
-
-                    current_weather_feels_like.set_label("");
-
-                    current_weather_humidity.set_label("");
-                    current_weather_humidity.set_tooltip_text(None);
-
-                    current_weather_prec.set_label("");
-                    current_weather_prec.set_tooltip_text(None);
-
-                    current_weather_wind.set_label("");
-
-                    current_weather_string.set_label("");
-                }
-            } else {
-                println!("Parsing current weather data!")
-            }
-        }
-    ));
 
     // Get the weather data every 15 minutes. 
     glib::spawn_future_local({
@@ -368,20 +413,10 @@ pub fn build_current_weather(current_weather_state: WeatherState, weather_result
         }
     });
 
-    // Button to update the current weather                                 DEBUG
-    let update_button = Button::with_label("Update weather");
-    update_button.connect_clicked(move |_| parse_weather());
-    // =======================
+    // Handle clicking in the widget
+    let click = GestureClick::new();
+    click.connect_pressed(move |_, _, _, _| parse_weather());
+    current_weather.add_controller(click);
 
-    // ROOT of WEATHER
-    let weather_box = Gbox::builder()
-        .orientation(gtk::Orientation::Vertical)
-        .margin_start(5)
-        .margin_end(5)
-        .margin_top(10)
-        .build();
-
-    weather_box.append(&current_weather);
-    weather_box.append(&update_button); //                           DEBUG
-    weather_box
+    (current_weather, update_ui)
 }
