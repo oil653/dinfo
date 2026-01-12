@@ -9,12 +9,11 @@ use crate::units::Units;
 use units::{Speed, Precipitation, Temperature};
 
 
-use std::sync::Arc;
 use async_channel;
 use tokio::runtime::Runtime;
 use std::sync::OnceLock;
 
-use chrono;
+use chrono::{self, Local};
 use std::time::Duration;
 
 
@@ -27,7 +26,10 @@ use clock::Clock;
 
 mod weather_state;
 
+
 const APP_ID: &str = "dinfo.oil653";
+static DATE_FORMAT: OnceLock<String> = OnceLock::new();
+static UNITS: OnceLock<Units> = OnceLock::new();
 
 fn runtime() -> &'static Runtime {
     static RUNTIME: OnceLock<Runtime> = OnceLock::new();
@@ -36,7 +38,7 @@ fn runtime() -> &'static Runtime {
     })
 }
 
-fn build_ui(app: &Application, units: Arc<Units>) {
+fn build_ui(app: &Application) {
     let state = GlobalState::new();
     let clock_state = state.clock().clone().expect("Clock state returned None. (This shouldnt happen)");
     let current_weather_state = state.weather().clone().expect("Clock state returned None. (This shouldnt happen)");
@@ -59,7 +61,6 @@ fn build_ui(app: &Application, units: Arc<Units>) {
     let monitors = gdk::Display::default().expect("Failed to get all monitors").monitors();
     for monitor in monitors.iter().flatten() {
         let current_snd = current_snd.clone();
-        let units = units.clone();
 
 
         //  =========> CLOCK <=========
@@ -131,12 +132,28 @@ fn build_ui(app: &Application, units: Arc<Units>) {
         
         let date = {
             Label::builder()
-            .label("2026/01/01")
+            .label(get_today_date())
             .name("date")
-            .css_classes(["text"])
+            .css_classes(["text", "emoji"])
             .vexpand(false)
             .build()
         };
+
+        glib::spawn_future_local(glib::clone!(
+            #[weak]
+            date,
+            async move {
+                // println!("{} seconds till midnight", get_seconds_to_midnight());
+                glib::timeout_future_seconds(get_seconds_to_midnight() as u32).await;
+
+                date.set_label(get_today_date().as_str());
+
+                loop {
+                    glib::timeout_future_seconds(get_seconds_to_midnight() as u32).await;
+                    date.set_label(get_today_date().as_str());
+                }
+            }
+        ));
 
         let time_date_box = {
             Gbox::builder()
@@ -148,7 +165,7 @@ fn build_ui(app: &Application, units: Arc<Units>) {
         time_date_box.append(&date);
 
         //  =========> WEATHER <=========
-        let wh = weather::CurrentWeather::new_example_with_code_fahrenheit(53);
+        let wh = weather::CurrentWeather::new_example_with_code_fahrenheit(0);
         
         // CURRENT WEATHER
         // LEFT
@@ -277,11 +294,10 @@ fn build_ui(app: &Application, units: Arc<Units>) {
                 }
 
                 let current_snd = current_snd.clone();
-                let units = units.clone();
 
                 runtime().spawn(
                     async move {
-                        let data = match weather::get_current_weather(&units).await {
+                        let data = match weather::get_current_weather(UNITS.get().unwrap()).await {
                             Ok(d) => Some(d),
                             Err(e) => {
                                 println!("{}", e.to_string());
@@ -295,6 +311,7 @@ fn build_ui(app: &Application, units: Arc<Units>) {
             }
         };
 
+        // Update the ui for changed in the weather var
         current_weather_state.connect_is_parsing_notify(glib::clone!(
             #[weak] current_weather_emoji,
             #[weak] current_weather_temp,
@@ -303,9 +320,13 @@ fn build_ui(app: &Application, units: Arc<Units>) {
             #[weak] current_weather_prec,
             #[weak] current_weather_wind,
             #[weak] current_weather_string,
+            #[weak] current_weather,
             move |state: &weather_state::WeatherState| {
                 if !state.is_parsing() {
                     if let Some(wh) = state.get_current() {
+
+                        current_weather.add_css_class("island");
+
                         current_weather_emoji.set_label(&wh.weather_code.to_emoji(wh.is_day));
                         current_weather_emoji.set_tooltip_text(Some(&format!("Cloud cover is {}%", wh.cloud_cover)));
 
@@ -328,7 +349,26 @@ fn build_ui(app: &Application, units: Arc<Units>) {
 
                         current_weather_string.set_label(&wh.weather_code.to_string());
                     } else {
-                        println!("Empty weather data received, leaving ui state untouched");
+                        println!("Empty weather data recieved :(");
+
+                        current_weather.remove_css_class("island");
+
+                        current_weather_emoji.set_label("");
+                        current_weather_emoji.set_tooltip_text(None);
+
+                        current_weather_temp.set_label("");
+
+                        current_weather_feels_like.set_label("");
+
+                        current_weather_humidity.set_label("");
+                        current_weather_humidity.set_tooltip_text(None);
+
+                        current_weather_prec.set_label("");
+                        current_weather_prec.set_tooltip_text(None);
+
+                        current_weather_wind.set_label("");
+
+                        current_weather_string.set_label("");
                     }
                 } else {
                     println!("Parsing current weather data!")
@@ -416,6 +456,25 @@ fn build_ui(app: &Application, units: Arc<Units>) {
     });
 }
 
+fn get_seconds_to_midnight() -> i64 {
+    let now = Local::now();
+
+    // Get todays midnight (most likely passed this already)
+    let mut midnigth = now
+        .date_naive()
+        .and_hms_opt(0, 0, 0)
+        .unwrap();
+
+    // Add one day so we get the first second of the new day
+    midnigth += Duration::from_hours(24);
+
+    (midnigth - now.naive_local()).num_seconds()
+}
+
+fn get_today_date() -> String {
+    Local::now().format(DATE_FORMAT.get().unwrap()).to_string()
+}
+
 fn load_css() {
     // Load the CSS file and add it to the provider
     let provider = CssProvider::new();
@@ -434,16 +493,16 @@ fn main() -> glib::ExitCode {
     unsafe {
         std::env::set_var("GSK_RENDERER", "cairo");
     }
-    let units = Arc::new(Units::new(Speed::Kmh, Temperature::Celsius, Precipitation::Mm));
+
+    UNITS.set(Units::new(Speed::Kmh, Temperature::Celsius, Precipitation::Mm)).expect("Failed to set UNITS static");
+    DATE_FORMAT.set("%d/%m/%Y".to_string()).expect("Failed to set DATE_FORMAT static");
 
     let app = Application::builder()
         .application_id(APP_ID)
         .build();
 
     app.connect_startup(|_| load_css());
-    app.connect_activate(move |app: &Application| {
-        build_ui(app, Arc::clone(&units));
-    });
+    app.connect_activate(build_ui);
 
     app.run()
 }

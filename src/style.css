@@ -1,15 +1,25 @@
 .text {
-    font-family: 'Jersey 15';
+    font-family: 'Jersey 15', 'SerenityOS Emoji';
+    color: #fab387;
+    text-shadow: 
+        -1px -1px 0 #313244,
+        1px -1px 0 #313244,
+        -1px 1px 0 #313244,
+        1px 1px 0 #313244;
 }
 
 .emoji {
     /* Insert cool emoji font family, probably */
+    /* Life update: GTK wont let me use emoji fonts :( */
     font-family: 'Jersey 15';
 }
 
 .island {
-    background-color: rgba(40, 40, 40, 0.5);
+    background-color: #3132447d;
     border-radius: 15px;
+    border-width: 2px;
+    border-style: solid;
+    border-color: #89b4fa;
 }
 
 .current_weather_title {
@@ -22,7 +32,6 @@
 
 
 .clock {
-    color: blue;                /* CHANGE ME, DEBUG COLOR ONLY! */
     font-size: 150px;
     line-height: 0.7;
     font-feature-settings: "tnum" 1;
@@ -49,15 +58,7 @@
     background-color: transparent;
 }
 
-/* Top section */
-#clock {
-    color: blue;                /* CHANGE ME, DEBUG COLOR ONLY! */
-    font-size: 150px;
-    line-height: 0.7;
-}
-
 #date {
-    color: blue;                /* CHANGE ME, DEBUG COLOR ONLY! */
     font-size: 60px;
     line-height: 0.8;
 }

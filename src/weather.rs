@@ -153,8 +153,8 @@ impl CurrentWeather {
             80,
             Wind::new(40.0, 16.0, Unit::Speed::Kmh)
         )
-        
     }
+    
     /// Creates an example struct with all the values filled in, the weather code can be passed.
     /// This also uses fahrenheit.
     /// Intended for testing and developing purposes
