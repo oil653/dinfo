@@ -5,8 +5,11 @@ use gtk::gdk;
 
 mod weather;
 mod units;
+mod upower;
+
 use crate::{ui_elements::build_current_weather, units::Units};
 use units::{Speed, Precipitation, Temperature};
+
 
 
 use async_channel;
@@ -91,8 +94,6 @@ fn build_ui(app: &Application) {
         window.set_monitor(Some(&monitor));
 
         window.present();
-
-        println!("{}", window.color());
     }
 
     // Animate, and drive the clock state changes
