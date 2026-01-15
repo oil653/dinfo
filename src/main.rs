@@ -91,6 +91,8 @@ fn build_ui(app: &Application) {
         window.set_monitor(Some(&monitor));
 
         window.present();
+
+        println!("{}", window.color());
     }
 
     // Animate, and drive the clock state changes
@@ -126,7 +128,7 @@ fn load_css() {
     gtk::style_context_add_provider_for_display(
         &Display::default().expect("Could not connect to a display."),
         &provider,
-        gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        gtk::STYLE_PROVIDER_PRIORITY_USER,
     );
 }
 

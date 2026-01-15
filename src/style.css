@@ -1,5 +1,5 @@
 .text {
-    font-family: 'Jersey 15', 'SerenityOS Emoji';
+    font-family: 'Jersey 15';
     color: #fab387;
     text-shadow: 
         -1px -1px 0 #313244,
@@ -60,6 +60,7 @@
 
 /* === WINDOW === */
 #main_window {
+    all: unset;
     background-color: transparent;
 }
 
