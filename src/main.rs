@@ -6,6 +6,7 @@ use gtk::gdk;
 mod weather;
 mod units;
 mod upower;
+use upower::UPower;
 
 use crate::{ui_elements::build_current_weather, units::Units};
 use units::{Speed, Precipitation, Temperature};
@@ -145,6 +146,25 @@ fn main() -> glib::ExitCode {
     let app = Application::builder()
         .application_id(APP_ID)
         .build();
+
+    glib::spawn_future_local(async move {
+        let meow = UPower::new().await;
+
+        meow.connect_closure("devices-changed", false, glib::closure_local!(   
+            move |obj: &UPower| {
+                println!("Got signal thingy");
+
+                glib::spawn_future_local(glib::clone!(
+                    #[strong]
+                    obj,
+                    async move {
+                        let devices = obj.get_devices().await;
+                        println!("{:#?}", devices);
+                    }
+                ));
+            }
+        ));
+    });
 
     app.connect_startup(|_| load_css());
     app.connect_activate(build_ui);

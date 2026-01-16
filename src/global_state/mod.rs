@@ -12,9 +12,14 @@ glib::wrapper!{
 
 impl GlobalState {
     pub fn new() -> Self {
-        Object::builder()
+        let obj = Object::builder()
         .property("clock", Some(Clock::new()))
         .property("weather", Some(WeatherState::new()))
-        .build()
+        .build();
+
+        glib::spawn_future_local(async move {
+        });
+
+        obj
     }
 }

@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 async-channel = "2.5.0"
+async-lock = "3.4.2"
 chrono = "0.4.42"
 futures = "0.3.31"
 gtk = { version = "0.10.3", package = "gtk4", features = ["v4_20"] }

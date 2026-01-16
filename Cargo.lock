@@ -426,6 +426,7 @@ name = "dinfo"
 version = "0.0.1"
 dependencies = [
  "async-channel",
+ "async-lock 3.4.2",
  "chrono",
  "futures",
  "gtk4",
